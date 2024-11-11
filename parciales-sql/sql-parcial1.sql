@@ -18,11 +18,4 @@
 */
 
 
--- Consulta para obtener el promedio de compras de todos los clientes del 2012
 
-SELECT
-    AVG(f.fact_total) as promedio_compras
-FROM Factura f
-WHERE YEAR(f.fact_fecha) = 2012
-GROUP BY f.fact_cliente, f.fact_total
-ORDER BY f.fact_cliente
