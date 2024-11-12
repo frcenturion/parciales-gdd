@@ -11,7 +11,7 @@
 CREATE TABLE intento_operaciones (
     id int IDENTITY(1,1) PRIMARY KEY,
     operacion VARCHAR(10),
-    fecha_hora DATETIME,
+    fecha_hora DATETIME
 )
 
 
@@ -26,7 +26,7 @@ BEGIN TRANSACTION
 
     -- Definimos qué operacion se está realizando
 
-    IF EXISTS (SELECT 1 FROM inserted)
+    IF EXISTS (SELECT 1 FROM inserted) AND NOT EXISTS(SELECT 1 FROM deleted)
     BEGIN
         SET @operacion = 'INSERT'
     END
@@ -65,11 +65,11 @@ BEGIN TRANSACTION
         ELSE IF @operacion = 'UPDATE'       -- Actualizamos los campos y si el inserted llega a ser null, dejamos el que tenia originalmente
         BEGIN
             UPDATE Cliente SET
-                clie_razon_social = COALESCE(i.clie_razon_social, Cliente.clie_razon_social),
-                clie_limite_credito = COALESCE(i.clie_limite_credito, Cliente.clie_razon_social),
-                clie_domicilio = COALESCE(i.clie_domicilio, Cliente.clie_razon_social),
-                clie_telefono = COALESCE(i.clie_telefono, Cliente.clie_razon_social),
-                clie_vendedor = COALESCE(i.clie_vendedor, Cliente.clie_razon_social)
+                clie_razon_social = i.clie_razon_social,
+                clie_limite_credito = i.clie_limite_credito,
+                clie_domicilio = i.clie_domicilio,
+                clie_telefono = i.clie_telefono,
+                clie_vendedor = i.clie_vendedor
             FROM inserted i
             WHERE Cliente.clie_codigo = i.clie_codigo
         END
@@ -77,4 +77,116 @@ BEGIN TRANSACTION
     END
 
 COMMIT
+
+
+
+
+-- OPCION 2:
+
+CREATE TABLE auditoria_op_masivas (aud_op_id INT PRIMARY KEY IDENTITY(0, 1), aud_operacion CHAR(8), aud_fecha_hora DATETIME, aud_dato CHAR(20))
+
+CREATE TRIGGER tg_operaciones_masivas ON Cliente
+    INSTEAD OF UPDATE, INSERT, DELETE
+    AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED
+    BEGIN TRANSACTION
+        -- Variables
+        DECLARE @cliente CHAR(6), @razon_social CHAR(100), @telefono CHAR(100), @domicilio CHAR(100), @limite_credito DECIMAL(12, 2), @vendedor NUMERIC(6, 0)
+
+        -- Cursor
+        DECLARE clientes CURSOR FOR
+            SELECT * FROM inserted
+
+        OPEN clientes
+        FETCH clientes INTO @cliente, @razon_social, @telefono, @domicilio, @limite_credito, @vendedor
+
+        WHILE @@FETCH_STATUS = 0
+            BEGIN
+                IF (SELECT COUNT() FROM inserted) > 1 OR (SELECT COUNT() FROM deleted) > 1-- Inserta la operación masiva en la tabla auditoría y lanzo un error
+                    BEGIN
+                        IF @cliente IN (SELECT clie_codigo FROM inserted) AND @cliente IN (SELECT clie_codigo FROM deleted)
+                            BEGIN
+                                IF @razon_social != (SELECT clie_razon_social FROM deleted WHERE clie_codigo = @cliente)
+                                    BEGIN
+                                        INSERT INTO auditoria_op_masivas (aud_operacion, aud_fecha_hora, aud_dato)
+                                        VALUES('UPDATE', GETDATE(), @razon_social)
+                                    END
+                                ELSE IF @telefono != (SELECT clie_telefono FROM deleted WHERE clie_codigo = @cliente)
+                                    BEGIN
+                                        INSERT INTO auditoria_op_masivas (aud_operacion, aud_fecha_hora, aud_dato)
+                                        VALUES('UPDATE', GETDATE(), @telefono)
+                                    END
+                                ELSE IF @domicilio != (SELECT clie_domicilio FROM deleted WHERE clie_codigo = @cliente)
+                                    BEGIN
+                                        INSERT INTO auditoria_op_masivas (aud_operacion, aud_fecha_hora, aud_dato)
+                                        VALUES('UPDATE', GETDATE(), @domicilio)
+                                    END
+                                ELSE IF @limite_credito != (SELECT clie_limite_credito FROM deleted WHERE clie_codigo = @cliente)
+                                    BEGIN
+                                        INSERT INTO auditoria_op_masivas (aud_operacion, aud_fecha_hora, aud_dato)
+                                        VALUES('UPDATE', GETDATE(), @limite_credito)
+                                    END
+                                ELSE IF @vendedor != (SELECT clie_vendedor FROM deleted WHERE clie_codigo = @cliente)
+                                    BEGIN
+                                        INSERT INTO auditoria_op_masivas (aud_operacion, aud_fecha_hora, aud_dato)
+                                        VALUES('UPDATE', GETDATE(), @vendedor)
+                                    END;
+
+                                THROW 50001, 'No se permiten operaciones masivas.', 1
+                            END
+                        ELSE IF @cliente IN (SELECT clie_codigo FROM inserted)
+                            BEGIN
+                                INSERT INTO auditoria_op_masivas (aud_operacion, aud_fecha_hora, aud_dato)
+                                VALUES('INSERT', GETDATE(), @cliente),
+                                      ('INSERT', GETDATE(), @razon_social),
+                                      ('INSERT', GETDATE(), @telefono),
+                                      ('INSERT', GETDATE(), @domicilio),
+                                      ('INSERT', GETDATE(), @limite_credito),
+                                      ('INSERT', GETDATE(), @vendedor);
+
+                                THROW 50001, 'No se permiten operaciones masivas.', 1
+                            END
+                        ELSE
+                            BEGIN
+                                INSERT INTO auditoria_op_masivas (aud_operacion, aud_fecha_hora, aud_dato)
+                                VALUES('DELETE', GETDATE(), @cliente),
+                                      ('DELETE', GETDATE(), @razon_social),
+                                      ('DELETE', GETDATE(), @telefono),
+                                      ('DELETE', GETDATE(), @domicilio),
+                                      ('DELETE', GETDATE(), @limite_credito),
+                                      ('DELETE', GETDATE(), @vendedor);
+                                THROW 50001, 'No se permiten operaciones masivas.', 1
+                            END
+                    END
+                ELSE -- Realizo la operación si no es masiva
+                    BEGIN
+                        IF @cliente IN (SELECT clie_codigo FROM inserted) AND @cliente IN (SELECT clie_codigo FROM deleted)
+                            BEGIN
+                                UPDATE Cliente
+                                SET clie_codigo = @cliente, clie_domicilio = @domicilio, clie_limite_credito = @limite_credito, clie_razon_social = @razon_social,
+                                    clie_telefono = @telefono, clie_vendedor = @vendedor
+                                WHERE clie_codigo = @cliente
+                            END
+                        ELSE IF @cliente IN (SELECT clie_codigo FROM inserted)
+                            BEGIN
+                                INSERT INTO Cliente (clie_codigo, clie_domicilio, clie_limite_credito, clie_razon_social, clie_telefono, clie_vendedor)
+                                VALUES(@cliente, @domicilio, @limite_credito, @razon_social, @telefono, @vendedor)
+                            END
+                        ELSE
+                            BEGIN
+                                DELETE FROM Cliente
+                                WHERE clie_codigo = @cliente
+                            END
+                    END
+
+                FETCH clientes INTO @cliente, @razon_social, @telefono, @domicilio, @limite_credito, @vendedor
+            END
+
+    COMMIT TRANSACTION
+
+    CLOSE clientes
+    DEALLOCATE clientes
+END
+
 

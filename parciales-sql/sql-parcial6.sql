@@ -3,12 +3,13 @@
 /*
     Sabiendo que un producto recurrente es aquel producto que al menos
     se compró durante 6 meses en el último año.
+
     Realizar una consulta SQL que muestre los clientes que tengan
     productos recurrentes y de estos clientes mostrar:
 
     i. El código de cliente.
     ii. El nombre del producto más comprado del cliente.
-    iii. La cantidad comprada total del cliente en el último año.
+    iii. La cantidad comprada total del cliente en el último año.       2022
 
     Ordenar el resultado por el nombre del cliente alfabéticamente.
 */
@@ -31,20 +32,14 @@ SELECT
 
     ) as nombre_producto_mas_comprado,
 
-    (
-        SELECT
-            SUM(if1.item_cantidad)
-        FROM Item_Factura if1
-        JOIN Factura f2 ON if1.item_tipo = f2.fact_tipo and if1.item_sucursal = f2.fact_sucursal and if1.item_numero = f2.fact_numero
-        WHERE f2.fact_cliente = f1.fact_cliente AND f2.fact_fecha >= DATEADD(YEAR, -1, (SELECT MAX(fact_fecha) FROM Factura)) -- Estamos diciendo que l fecha sea mayor o igual a el año - 1
-
-    ) as cantidad_comprada_total
+    SUM(if2.item_cantidad) as cantidad_total_comprada
 
 FROM Factura f1
 JOIN Cliente c1 ON f1.fact_cliente = c1.clie_codigo
 JOIN Item_Factura if2 ON f1.fact_tipo = if2.item_tipo and f1.fact_sucursal = if2.item_sucursal and f1.fact_numero = if2.item_numero
-WHERE if2.item_producto IN (SELECT item_producto FROM Item_Factura WHERE fact_fecha >= DATEADD(MONTH, -6, (SELECT MAX(fact_fecha) FROM Factura)))
+WHERE f1.fact_fecha >= DATEADD(YEAR, -1, (SELECT MAX(fact_fecha) FROM Factura)) -- Estamos diciendo que l fecha sea mayor o igual a el año - 1
 GROUP BY f1.fact_cliente, c1.clie_razon_social
+HAVING COUNT(DISTINCT MONTH(f1.fact_fecha)) >= 6
 ORDER BY c1.clie_razon_social
 
 

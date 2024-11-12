@@ -1,4 +1,4 @@
------------------------------- SQL - PARCIAL 1 ------------------------------
+------------------------------ SQL - PARCIAL 1 (12/11/2022) ------------------------------
 
 /*
     Realizar una consulta SQL que permita saber los clientes que compraron por encima del promedio de compras

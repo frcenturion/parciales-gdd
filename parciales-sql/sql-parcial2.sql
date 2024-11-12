@@ -1,4 +1,4 @@
------------------------------- SQL - PARCIAL 2 ------------------------------
+------------------------------ SQL - PARCIAL 2 (28/07/2023) ------------------------------
 
 /*
     Realizar una consulta SQL que devuelva todos los clientes que durante 2 años consecutivos compraron al menos 5
