@@ -27,6 +27,7 @@ BEGIN
         FROM Factura f
             JOIN Item_Factura if1 ON f.fact_tipo = if1.item_tipo and f.fact_sucursal = if1.item_sucursal and f.fact_numero = if1.item_numero
         WHERE f.fact_fecha >= @fecha AND if1.item_producto = @producto
+        ORDER BY f.fact_fecha
 
     OPEN cur_facturas
     FETCH cur_facturas INTO
@@ -39,12 +40,15 @@ BEGIN
                 SET @contador = @contador + 1
                 SET @dias_consecutivos = @dias_consecutivos + 1
             end
-        ELSE IF @mayor_cantidad_dias_consecutivos < @dias_consecutivos
+        ELSE
             BEGIN
-                SET @mayor_cantidad_dias_consecutivos = @dias_consecutivos
-            end
-        ELSE IF DATEDIFF(day, @fecha, @fact_fecha) != @contador
-            BEGIN
+                -- En este caso ya dejamos de tener dias consecutivos
+                IF @mayor_cantidad_dias_consecutivos < @dias_consecutivos
+                BEGIN
+                    SET @mayor_cantidad_dias_consecutivos = @dias_consecutivos
+                END
+
+
                 -- Reiniciamos el contador y la cantidad de dias consecutivos
                 SET @contador = 1
                 SET @dias_consecutivos = 0
