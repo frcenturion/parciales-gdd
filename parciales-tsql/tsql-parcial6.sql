@@ -190,3 +190,69 @@ BEGIN
 END
 
 
+
+
+
+-- OTRA OPCION
+
+--DROP TRIGGER PreventClientMassiveOperation;
+CREATE TRIGGER PreventClientMassiveOperation ON Cliente
+    INSTEAD OF INSERT, UPDATE, DELETE
+    AS
+BEGIN
+    DECLARE @affected_rows INT;
+    DECLARE @operation_type VARCHAR(10);
+    DECLARE @data nvarchar(MAX)
+
+    BEGIN TRANSACTION;
+
+    IF EXISTS (SELECT * FROM INSERTED) AND NOT EXISTS (SELECT * FROM DELETED)
+        BEGIN
+            SET @affected_rows = (SELECT COUNT(*) FROM INSERTED);
+            SET @operation_type = 'INSERT';
+            SET @data = (SELECT * FROM INSERTED FOR JSON AUTO)
+        END
+    ELSE IF EXISTS (SELECT * FROM INSERTED) AND EXISTS (SELECT * FROM DELETED)
+        BEGIN
+            SET @affected_rows = (SELECT COUNT(*) FROM INSERTED);
+            SET @operation_type = 'UPDATE';
+            SET @data = (SELECT * FROM INSERTED FOR JSON AUTO) + (SELECT * FROM DELETED FOR JSON AUTO)
+        END
+    ELSE
+        BEGIN
+            SET @affected_rows = (SELECT COUNT(*) FROM DELETED);
+            SET @operation_type = 'DELETE';
+            SET @data = (SELECT * FROM DELETED FOR JSON AUTO)
+        END
+
+    IF @affected_rows > 1
+        BEGIN
+            INSERT INTO OperationLog(operation_type, data, affected_rows, description)
+            VALUES (@operation_type, @data, @affected_rows, CONCAT('Attempted massive ', @operation_type, ' on Cliente'));
+            RAISERROR('No se permiten operaciones masivas en tabla Cliente', 16, 1);
+        END
+    ELSE
+        BEGIN
+            IF @operation_type = 'INSERT'
+                BEGIN
+                    INSERT INTO Cliente
+                    SELECT * FROM INSERTED;
+                END
+            ELSE IF @operation_type = 'UPDATE'
+                BEGIN
+                    DELETE FROM Cliente
+                    WHERE clie_codigo IN (SELECT clie_codigo FROM DELETED);
+
+                    INSERT INTO Cliente
+                    SELECT * FROM INSERTED;
+                END
+            ELSE IF @operation_type = 'DELETE'
+                BEGIN
+                    DELETE FROM Cliente
+                    WHERE clie_codigo IN (SELECT clie_codigo FROM DELETED);
+                END
+        END
+    COMMIT TRANSACTION;
+END;
+
+

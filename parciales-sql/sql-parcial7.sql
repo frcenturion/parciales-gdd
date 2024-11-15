@@ -59,6 +59,8 @@ ORDER BY (
 
         )
 
+--ORDER BY
+--SUM(CASE WHEN YEAR(f.fact_fecha) = 2011 THEN i.item_cantidad ELSE 0 END)
 
 
 ----------------- Consultas auxiliares -----------------
