@@ -87,6 +87,14 @@ BEGIN TRANSACTION
 
                     INSERT INTO Cliente
                     SELECT * FROM inserted
+
+                    UPDATE c SET
+                        c.clie_codigo = i.clie_codigo
+                        -- etc.
+                    FROM Cliente c JOIN inserted i ON c.clie_codigo = i.clie_codigo
+
+
+
                 END
             ELSE
                 BEGIN

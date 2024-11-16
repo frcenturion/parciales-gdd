@@ -26,7 +26,7 @@ SELECT
             JOIN Item_Factura if2 ON f2.fact_tipo = if2.item_tipo and f2.fact_sucursal = if2.item_sucursal and f2.fact_numero = if2.item_numero
             JOIN Producto p2 ON if2.item_producto = p2.prod_codigo
         WHERE f2.fact_cliente = f1.fact_cliente
-        GROUP BY p2.prod_detalle
+        GROUP BY p2.prod_detalle, if2.item_producto
         ORDER BY SUM(if2.item_cantidad)
 
     ) as producto_mas_comprado,

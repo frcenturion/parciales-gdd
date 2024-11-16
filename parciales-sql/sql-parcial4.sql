@@ -57,22 +57,45 @@ SELECT
 FROM Cliente c1
     JOIN Factura f1 ON c1.clie_codigo = f1.fact_cliente
     JOIN Item_Factura if1 ON f1.fact_tipo = if1.item_tipo and f1.fact_sucursal = if1.item_sucursal and f1.fact_numero = if1.item_numero
-WHERE YEAR(f1.fact_fecha) = 2012
+    JOIN Producto p1 ON if1.item_producto = p1.prod_codigo
+    JOIN Rubro r1 ON p1.prod_rubro = r1.rubr_id
+--WHERE YEAR(f1.fact_fecha) = 2012
 GROUP BY c1.clie_codigo, c1.clie_razon_social
-HAVING (
+/*HAVING /*(
             SELECT
-                COUNT(DISTINCT r.rubr_id)
-            FROM Rubro r                        -- Cantidad de rubros totales
-        ) = (
+                COUNT(DISTINCT rubr_id)
+            FROM Rubro                         -- Cantidad de rubros totales
+        ) = COUNT(DISTINCT r1.rubr_id)
+*/
+
+
+    (
+        SELECT
+            COUNT(DISTINCT rubr_id)
+        FROM Rubro                         -- Cantidad de rubros totales
+    ) =
+
+    (
             SELECT
                 COUNT(DISTINCT r2.rubr_id)
             FROM Rubro r2
                 JOIN Producto p2  ON r2.rubr_id = p2.prod_rubro
                 JOIN Item_Factura if3 ON p2.prod_codigo = if3.item_producto
-            WHERE if
-
-    )
+                JOIN Factura f3 ON if3.item_tipo = f3.fact_tipo and if3.item_sucursal = f3.fact_sucursal and if3.item_numero = f3.fact_numero
+        )*/
 ORDER BY c1.clie_razon_social
+/*         CASE
+             WHEN SUM(f1.fact_total) BETWEEN (SELECT
+                                                0.2 * SUM(fact_total)
+                                              FROM Factura
+                                              WHERE YEAR(fact_fecha) =  2012
+                                                  ) AND (SELECT
+                                                            0.3 * SUM(fact_total)
+                                                         FROM Factura
+                                                         WHERE YEAR(fact_fecha) =  2012)
+             THEN 0
+             ELSE 1
+        END*/
 
 
 

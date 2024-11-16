@@ -14,63 +14,79 @@ CREATE TRIGGER tr_generador_combo
     ON Item_Factura INSTEAD OF INSERT
 AS
 BEGIN TRANSACTION
-    DECLARE @cantidad_combos int
-    DECLARE @combo char(8)
+
+    DECLARE @combo CHAR(8)
+    DECLARE @cantidad_combos INT
+    DECLARE @precio_combo DECIMAL(12,2)
+
+    DECLARE @item_tipo CHAR(1)
+    DECLARE @item_sucursal CHAR(4)
+    DECLARE @item_numero CHAR(8)
+
+    DECLARE @item_producto CHAR(8)
+    DECLARE @item_cantidad DECIMAL(12,2)
+    DECLARE @item_precio DECIMAL(12,2)
+
+    -- Cursos para recorrerme los productos que NO sean compuestos de otros productos (los compuestos se agrupan en el proximo cursor)
+        DECLARE cur_prod_normal CURSOR FOR
+            SELECT
+                *
+            FROM inserted i
+            WHERE i.item_producto NOT IN (SELECT comp_componente FROM Composicion)      -- Que no sea un componente
 
 
-    -- Hacer un cursor que recorra los insertados agrupados por combos
+    -- En el insert tengo TODOS los productos, pero algunos de ellos pueden formar un combo
+    -- Lo que tendria que hacer es chequear qué combos puedo formar y en qué cantidad
 
-    DECLARE cursor_producto CURSOR FOR
+    -- Cursor para recorrerme los productos que tienen composicion (o sea, los posibles combos)
+    DECLARE cur_combo CURSOR FOR
         SELECT
-            c1.comp_producto
+            c.comp_producto         -- Seleccionamos los productos que tengan compuestos
         FROM inserted i
-        JOIN Composicion c1 ON i.item_producto = c1.comp_componente
-        WHERE i.item_cantidad >= c1.comp_cantidad
-        GROUP BY c1.comp_producto
-        having COUNT(*) = (select COUNT(*) from Composicion as C2 where C2.comp_producto= C1.comp_producto)
+            JOIN Composicion c ON c.comp_componente = i.item_producto
+        WHERE i.item_cantidad >= c.comp_cantidad                -- Y cuya cantidad insertada sea mayor o igual a los que requiere
+        GROUP BY c.comp_producto
+        HAVING COUNT(*) = (SELECT COUNT(*) FROM Composicion c2 WHERE c2.comp_producto = c.comp_producto)    -- Que el numero de componentes de la insercion coincida con el numero de componentes necesarios para el combo
+
+    OPEN cur_combo
+    FETCH cur_combo INTO @combo
+    WHILE @@fetch_status = 0
+        BEGIN
+
+            SELECT
+                i.item_tipo = @item_tipo,
+                i.item_sucursal = @item_sucursal,
+                i.item_numero = @item_numero
+            FROM inserted i
+                WHERE i.item_producto = @combo
 
 
+            -- Buscamos la cantidad de combos
+            SET @cantidad_combos = (SELECT
+                                        MIN(FLOOR(i2.item_cantidad / c2.comp_cantidad))
+                                    FROM inserted i2
+                                        JOIN Composicion c2 ON c2.comp_producto = i2.item_producto
+                                    WHERE i2.item_cantidad >= c2.comp_cantidad AND c2.comp_producto = @combo)
+
+            -- Seteamos el precio del combo
+            SET @precio_combo = @cantidad_combos * (SELECT prod_precio FROM Producto WHERE prod_codigo = @combo)
+
+            -- Insertamos en Item_Factura la fila con el combo
+            INSERT INTO Item_Factura (item_tipo, item_sucursal, item_numero, item_producto, item_cantidad, item_precio)
+                VALUES (@item_tipo, @item_sucursal, @item_numero, @combo, @cantidad_combos, @precio_combo)
 
 
+            FETCH NEXT FROM cur_combo INTO @Combo
 
-    -- Sacar cuantos combos podemos armar teniendo en cuenta el producto limitante
+        END
 
-    SELECT
-        @cantidad_combos = MIN(FLOOR(i.item_cantidad / c1.comp_cantidad))
-    FROM inserted i
-    JOIN Composicion c1 ON i.item_producto = c1.comp_componente
-    WHERE i.item_cantidad >= c1.comp_cantidad
+        CLOSE cur_combo
+        DEALLOCATE cur_combo
 
 
+        -- Ahora recorremos los demás productos que no sean componentes de otro
 
-    -- Armamos el combo y lo insertamos
-
+        -- etc.
 
 
 COMMIT
-
-
-
-INSERT INTO Item_Factura (item_tipo, item_sucursal, item_numero, item_producto, item_cantidad, item_precio)
-    VALUES
-        ('A', '003', '1', '00000030', '2', '3000'),
-        ('A', '003', '1', '00000030', '2', '3000')
-
-
-
-SELECT
-    MIN(FLOOR(it.item_cantidad / c1.comp_cantidad))
-FROM Item_Factura it
-         JOIN Composicion c1 ON it.item_producto = c1.comp_componente
-WHERE it.item_cantidad >= c1.comp_cantidad
-
-
-
-
-SELECT
-    comp_producto
-FROM Item_Factura it
-         JOIN Composicion c1 ON it.item_producto = c1.comp_componente
-WHERE it.item_cantidad >= c1.comp_cantidad
-GROUP BY comp_producto
-having COUNT(*) = (select COUNT(*) from Composicion as C2 where C2.comp_producto= C1.comp_producto)
