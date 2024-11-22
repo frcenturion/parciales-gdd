@@ -12,7 +12,6 @@
 
 -- Al registrar un Item_Factura (insert) tenemos que hacer el chequeo de stock con un trigger INSTEAD OF
 
-DROP TRIGGER tr_validacion_venta
 CREATE TRIGGER tr_validacion_venta
     ON Item_Factura INSTEAD OF INSERT
     AS

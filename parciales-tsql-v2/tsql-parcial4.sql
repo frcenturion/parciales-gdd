@@ -10,8 +10,6 @@
 */
 
 
-
-
 CREATE TRIGGER tr_generador_combo
     ON Item_Factura INSTEAD OF INSERT
 AS

@@ -79,6 +79,22 @@ EXEC pr_productos_mas_vendidos
 SELECT * FROM diez_productos_mas_vendidos_por_anio
 
 
+-- LO QUE ME FALTO HACER EN EL PARCIAL PARA APROBAR:
+
+CREATE TRIGGER tr_productos_mas_vendidos ON
+    Item_Factura AFTER UPDATE, INSERT, DELETE
+AS
+BEGIN TRANSACTION
+
+    -- Por cada insert, update y delete de un item factura boramos la tabla
+    DELETE FROM diez_productos_mas_vendidos_por_anio
+
+    -- Y volvemos a ejecutar el procedure para llenarla
+    EXEC pr_productos_mas_vendidos
+
+COMMIT
+
+
 
 
 
