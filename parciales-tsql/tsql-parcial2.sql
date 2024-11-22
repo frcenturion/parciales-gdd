@@ -46,7 +46,7 @@ COMMIT
 -- Variante con cursor
 
 CREATE TRIGGER tr_insert_update_fk
-    ON Cliente AFTER INSERT, UPDATE
+    ON Cliente AFTER INSERT, UPDATE         -- Esta mal el after porque aca ya se hizo la insercion
     AS
     BEGIN TRANSACTION
 
